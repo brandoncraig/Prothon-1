@@ -2174,7 +2174,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
     case While_kind:
         return compiler_while(c, s);
     case Until_kind:
-	return compiler_until(c, s):
+	return compiler_until(c, s);
     case If_kind:
         return compiler_if(c, s);
     case Raise_kind:

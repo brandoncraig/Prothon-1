@@ -1077,6 +1077,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
     case Until_kind:
 	VISIT(st, expr, s->v.Until.test);
 	VISIT_SEQ(st, stmt, s->v.Until.body);
+	break;
     case If_kind:
         /* XXX if 0: and lookup_yield() hacks */
         VISIT(st, expr, s->v.If.test);
