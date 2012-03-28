@@ -899,7 +899,7 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     int name_i = 1;
 
     REQ(n, funcdef);
-
+ 
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
         return NULL;
@@ -912,7 +912,7 @@ ast_for_funcdef(struct compiling *c, const node *n, asdl_seq *decorator_seq)
     if (!body)
         return NULL;
 
-    return FunctionDef(name, args, body, decorator_seq, LINENO(n),
+   return FunctionDef(name, args, body, decorator_seq, LINENO(n),
                        n->n_col_offset, c->c_arena);
 }
 
@@ -2719,6 +2719,44 @@ ast_for_assert_stmt(struct compiling *c, const node *n)
     return NULL;
 }
 
+static stmt_ty
+ast_for_fact_stmt(struct compiling *c, const node *n)
+{
+    /* fact_stmt: 'fact' NAME '(' testlist ')' (',' '(' testlist ')')* */
+    identifier name;
+    
+    int name_i = 1;
+
+
+    REQ(n, fact_stmt);
+    if (NCH(n) >= 5) {
+      asdl_seq* seq;
+      expr_ty exp;
+      int i = 3;
+
+      name = NEW_IDENTIFIER(CHILD(n, name_i));
+      if (!name)
+          return NULL;
+      else if (!forbidden_check(c, CHILD(n, name_i), STR(CHILD(n, name_i))))
+          return NULL;
+
+      seq = asdl_seq_new((NCH(n)-5)/4+1, c->c_arena); 
+      for(;i<NCH(n);i+=4) {
+        exp = ast_for_testlist(c, CHILD(n, i));
+        if (!exp)
+          return NULL;
+        asdl_seq_SET(seq, (i-3)/4, exp);
+      }
+
+      return Fact(name, seq, LINENO(n), n->n_col_offset, c->c_arena);
+    }
+
+    PyErr_Format(PyExc_SystemError,
+                 "improper number of parts to 'fact' statement: %d",
+                 NCH(n));
+    return NULL;
+}
+
 static asdl_seq *
 ast_for_suite(struct compiling *c, const node *n)
 {
@@ -3264,6 +3302,8 @@ ast_for_stmt(struct compiling *c, const node *n)
                 return ast_for_exec_stmt(c, n);
             case assert_stmt:
                 return ast_for_assert_stmt(c, n);
+            case fact_stmt:
+                return ast_for_fact_stmt(c, n);
             default:
                 PyErr_Format(PyExc_SystemError,
                              "unhandled small_stmt: TYPE=%d NCH=%d\n",

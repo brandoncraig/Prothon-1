@@ -2,7 +2,7 @@
 
 
 /*
-   __version__ 82160.
+   __version__ .
 
    This module must be committed separately after each AST grammar change;
    The __version__ number is set to the revision number of the commit
@@ -150,6 +150,11 @@ static char *Expr_fields[]={
 static PyTypeObject *Pass_type;
 static PyTypeObject *Break_type;
 static PyTypeObject *Continue_type;
+static PyTypeObject *Fact_type;
+static char *Fact_fields[]={
+        "name",
+        "values",
+};
 static PyTypeObject *expr_type;
 static char *expr_attributes[] = {
         "lineno",
@@ -719,6 +724,8 @@ static int init_types(void)
         if (!Break_type) return 0;
         Continue_type = make_type("Continue", stmt_type, NULL, 0);
         if (!Continue_type) return 0;
+        Fact_type = make_type("Fact", stmt_type, Fact_fields, 2);
+        if (!Fact_type) return 0;
         expr_type = make_type("expr", &AST_type, NULL, 0);
         if (!expr_type) return 0;
         if (!add_attributes(expr_type, expr_attributes, 2)) return 0;
@@ -1453,6 +1460,27 @@ Continue(int lineno, int col_offset, PyArena *arena)
         if (!p)
                 return NULL;
         p->kind = Continue_kind;
+        p->lineno = lineno;
+        p->col_offset = col_offset;
+        return p;
+}
+
+stmt_ty
+Fact(identifier name, asdl_seq * values, int lineno, int col_offset, PyArena
+     *arena)
+{
+        stmt_ty p;
+        if (!name) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field name is required for Fact");
+                return NULL;
+        }
+        p = (stmt_ty)PyArena_Malloc(arena, sizeof(*p));
+        if (!p)
+                return NULL;
+        p->kind = Fact_kind;
+        p->v.Fact.name = name;
+        p->v.Fact.values = values;
         p->lineno = lineno;
         p->col_offset = col_offset;
         return p;
@@ -2526,6 +2554,20 @@ ast2obj_stmt(void* _o)
         case Continue_kind:
                 result = PyType_GenericNew(Continue_type, NULL, NULL);
                 if (!result) goto failed;
+                break;
+        case Fact_kind:
+                result = PyType_GenericNew(Fact_type, NULL, NULL);
+                if (!result) goto failed;
+                value = ast2obj_identifier(o->v.Fact.name);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "name", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
+                value = ast2obj_list(o->v.Fact.values, ast2obj_expr);
+                if (!value) goto failed;
+                if (PyObject_SetAttrString(result, "values", value) == -1)
+                        goto failed;
+                Py_DECREF(value);
                 break;
         }
         value = ast2obj_int(o->lineno);
@@ -4661,6 +4703,55 @@ obj2ast_stmt(PyObject* obj, stmt_ty* out, PyArena* arena)
                 if (*out == NULL) goto failed;
                 return 0;
         }
+        isinstance = PyObject_IsInstance(obj, (PyObject*)Fact_type);
+        if (isinstance == -1) {
+                return 1;
+        }
+        if (isinstance) {
+                identifier name;
+                asdl_seq* values;
+
+                if (PyObject_HasAttrString(obj, "name")) {
+                        int res;
+                        tmp = PyObject_GetAttrString(obj, "name");
+                        if (tmp == NULL) goto failed;
+                        res = obj2ast_identifier(tmp, &name, arena);
+                        if (res != 0) goto failed;
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"name\" missing from Fact");
+                        return 1;
+                }
+                if (PyObject_HasAttrString(obj, "values")) {
+                        int res;
+                        Py_ssize_t len;
+                        Py_ssize_t i;
+                        tmp = PyObject_GetAttrString(obj, "values");
+                        if (tmp == NULL) goto failed;
+                        if (!PyList_Check(tmp)) {
+                                PyErr_Format(PyExc_TypeError, "Fact field \"values\" must be a list, not a %.200s", tmp->ob_type->tp_name);
+                                goto failed;
+                        }
+                        len = PyList_GET_SIZE(tmp);
+                        values = asdl_seq_new(len, arena);
+                        if (values == NULL) goto failed;
+                        for (i = 0; i < len; i++) {
+                                expr_ty value;
+                                res = obj2ast_expr(PyList_GET_ITEM(tmp, i), &value, arena);
+                                if (res != 0) goto failed;
+                                asdl_seq_SET(values, i, value);
+                        }
+                        Py_XDECREF(tmp);
+                        tmp = NULL;
+                } else {
+                        PyErr_SetString(PyExc_TypeError, "required field \"values\" missing from Fact");
+                        return 1;
+                }
+                *out = Fact(name, values, lineno, col_offset, arena);
+                if (*out == NULL) goto failed;
+                return 0;
+        }
 
         tmp = PyObject_Repr(obj);
         if (tmp == NULL) goto failed;
@@ -6570,7 +6661,7 @@ init_ast(void)
         if (PyDict_SetItemString(d, "AST", (PyObject*)&AST_type) < 0) return;
         if (PyModule_AddIntConstant(m, "PyCF_ONLY_AST", PyCF_ONLY_AST) < 0)
                 return;
-        if (PyModule_AddStringConstant(m, "__version__", "82160") < 0)
+        if (PyModule_AddStringConstant(m, "__version__", "") < 0)
                 return;
         if (PyDict_SetItemString(d, "mod", (PyObject*)mod_type) < 0) return;
         if (PyDict_SetItemString(d, "Module", (PyObject*)Module_type) < 0)
@@ -6617,6 +6708,7 @@ init_ast(void)
         if (PyDict_SetItemString(d, "Break", (PyObject*)Break_type) < 0) return;
         if (PyDict_SetItemString(d, "Continue", (PyObject*)Continue_type) < 0)
             return;
+        if (PyDict_SetItemString(d, "Fact", (PyObject*)Fact_type) < 0) return;
         if (PyDict_SetItemString(d, "expr", (PyObject*)expr_type) < 0) return;
         if (PyDict_SetItemString(d, "BoolOp", (PyObject*)BoolOp_type) < 0)
             return;

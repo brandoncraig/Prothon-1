@@ -65,7 +65,7 @@ enum _stmt_kind {FunctionDef_kind=1, ClassDef_kind=2, Return_kind=3,
                   Raise_kind=12, TryExcept_kind=13, TryFinally_kind=14,
                   Assert_kind=15, Import_kind=16, ImportFrom_kind=17,
                   Exec_kind=18, Global_kind=19, Expr_kind=20, Pass_kind=21,
-                  Break_kind=22, Continue_kind=23};
+                  Break_kind=22, Continue_kind=23, Fact_kind=24};
 struct _stmt {
         enum _stmt_kind kind;
         union {
@@ -178,6 +178,11 @@ struct _stmt {
                 struct {
                         expr_ty value;
                 } Expr;
+                
+                struct {
+                        identifier name;
+                        asdl_seq *values;
+                } Fact;
                 
         } v;
         int lineno;
@@ -446,6 +451,9 @@ stmt_ty _Py_Pass(int lineno, int col_offset, PyArena *arena);
 stmt_ty _Py_Break(int lineno, int col_offset, PyArena *arena);
 #define Continue(a0, a1, a2) _Py_Continue(a0, a1, a2)
 stmt_ty _Py_Continue(int lineno, int col_offset, PyArena *arena);
+#define Fact(a0, a1, a2, a3, a4) _Py_Fact(a0, a1, a2, a3, a4)
+stmt_ty _Py_Fact(identifier name, asdl_seq * values, int lineno, int
+                 col_offset, PyArena *arena);
 #define BoolOp(a0, a1, a2, a3, a4) _Py_BoolOp(a0, a1, a2, a3, a4)
 expr_ty _Py_BoolOp(boolop_ty op, asdl_seq * values, int lineno, int col_offset,
                    PyArena *arena);

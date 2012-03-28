@@ -1569,7 +1569,7 @@ compiler_print(struct compiler *c, stmt_ty s)
         else {
             VISIT(c, expr, e);
             ADDOP(c, PRINT_ITEM);
-        }
+      }
     }
     if (s->v.Print.nl) {
         if (dest)
@@ -1702,6 +1702,21 @@ compiler_while(struct compiler *c, stmt_ty s)
         VISIT_SEQ(c, stmt, s->v.While.orelse);
     compiler_use_next_block(c, end);
 
+    return 1;
+}
+
+static int
+compiler_fact(struct compiler *c, stmt_ty s)
+{
+    expr_ty e;
+    int n = asdl_seq_LEN(s->v.Fact.values);
+    int i = 0;
+    for(; i<n; i++) {
+      e = (expr_ty)asdl_seq_GET(s->v.Fact.values, i);
+      VISIT(c, expr, e);
+      ADDOP(c, PRINT_ITEM);
+    }
+    // prinf("")
     return 1;
 }
 
@@ -2133,6 +2148,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         return compiler_for(c, s);
     case While_kind:
         return compiler_while(c, s);
+    case Fact_kind:
+        return compiler_fact(c, s);
     case If_kind:
         return compiler_if(c, s);
     case Raise_kind:
